@@ -3104,6 +3104,12 @@ def server(
         # this foreground server instead of tearing it down on a spurious
         # sig mismatch.
         register_local_server(port)
+    from omnigent.server.bind_safety import assert_safe_network_bind
+
+    try:
+        assert_safe_network_bind(host)
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
     try:
         uvicorn.run(
             app,

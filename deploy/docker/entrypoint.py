@@ -122,7 +122,13 @@ try:
     # ("${VAR:-}"): empty and missing both mean "not explicitly pinned".
     _raw_auth_provider = os.environ.get("OMNIGENT_AUTH_PROVIDER")
     _auth_provider_explicit = bool(_raw_auth_provider and _raw_auth_provider.strip())
-    if not _auth_provider_explicit and not env_var_is_truthy("OMNIGENT_AUTH_ENABLED"):
+    from omnigent.server.bind_safety import is_loopback_bind_host
+
+    if (
+        not _auth_provider_explicit
+        and not env_var_is_truthy("OMNIGENT_AUTH_ENABLED")
+        and is_loopback_bind_host(HOST)
+    ):
         os.environ.setdefault("OMNIGENT_LOCAL_SINGLE_USER", "1")
 
     # Accounts mode ergonomics: when the operator hasn't set them, supply the
@@ -148,6 +154,10 @@ try:
             os.environ["OMNIGENT_ACCOUNTS_BASE_URL"] = detect_base_url(
                 os.environ, host=HOST, port=PORT
             )
+
+    from omnigent.server.bind_safety import assert_safe_network_bind
+
+    assert_safe_network_bind(HOST)
 
     # ── Migrations ───────────────────────────────────────────
     # Alembic upgrade runs before the stores boot — the SQLAlchemy
