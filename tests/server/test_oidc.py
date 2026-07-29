@@ -156,7 +156,31 @@ def _mock_request(
     mock = MagicMock()
     mock.headers = headers or {}
     mock.cookies = cookies or {}
+    mock.client = MagicMock()
+    mock.client.host = "127.0.0.1"
     return mock
+
+
+def test_header_source_rejects_spoofed_header_from_untrusted_peer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Direct clients cannot impersonate via X-Forwarded-Email in header mode."""
+    monkeypatch.delenv("OMNIGENT_LOCAL_SINGLE_USER", raising=False)
+    provider = UnifiedAuthProvider(source="header", local_single_user=False)
+    request = _mock_request(headers={"X-Forwarded-Email": "evil@example.com"})
+    request.client.host = "203.0.113.7"
+    assert provider.get_user_id(request) is None
+
+
+def test_header_source_accepts_header_from_trusted_cidr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OMNIGENT_LOCAL_SINGLE_USER", raising=False)
+    monkeypatch.setenv("OMNIGENT_TRUSTED_PROXY_CIDRS", "203.0.113.0/24")
+    provider = UnifiedAuthProvider(source="header", local_single_user=False)
+    request = _mock_request(headers={"X-Forwarded-Email": "alice@example.com"})
+    request.client.host = "203.0.113.7"
+    assert provider.get_user_id(request) == "alice@example.com"
 
 
 def test_header_source_returns_email_from_header() -> None:

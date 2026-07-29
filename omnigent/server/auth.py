@@ -24,6 +24,7 @@ and closed over by route factories — no per-request import cost.
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import time
@@ -52,6 +53,11 @@ _TRUTHY_STRINGS = ("1", "true", "yes")
 # :meth:`UnifiedAuthProvider._check_header`) and host_id re-owning in
 # routes/host_tunnel.py.
 _LOCAL_SINGLE_USER_ENV = "OMNIGENT_LOCAL_SINGLE_USER"
+_TRUSTED_PROXY_CIDRS_ENV = "OMNIGENT_TRUSTED_PROXY_CIDRS"
+# Peers allowed to assert X-Forwarded-Email in multi-user header mode.
+_TRUSTED_PROXY_CLIENT_HOSTS = frozenset(
+    {"127.0.0.1", "::1", "localhost", "testclient"}
+)
 
 LEVEL_READ = 1
 LEVEL_EDIT = 2
@@ -90,6 +96,39 @@ def local_single_user_enabled() -> bool:
     :returns: ``True`` when the single-user marker is set and truthy.
     """
     return env_var_is_truthy(_LOCAL_SINGLE_USER_ENV)
+
+
+def peer_is_trusted_proxy(client_host: str | None) -> bool:
+    """Return whether the direct TCP peer may assert ``X-Forwarded-Email``.
+
+    Header auth mode trusts the identity header only when the request
+    arrives from loopback (a co-located reverse proxy) or from an
+    operator-configured CIDR list (``OMNIGENT_TRUSTED_PROXY_CIDRS``).
+    Direct network clients cannot impersonate by setting the header.
+    """
+    if not client_host:
+        return False
+    if client_host in _TRUSTED_PROXY_CLIENT_HOSTS:
+        return True
+    try:
+        addr = ipaddress.ip_address(client_host)
+    except ValueError:
+        return False
+    if addr.is_loopback:
+        return True
+    raw = os.environ.get(_TRUSTED_PROXY_CIDRS_ENV, "").strip()
+    if not raw:
+        return False
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            if addr in ipaddress.ip_network(part, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 _auth_enabled_deprecation_warned = False
@@ -353,6 +392,9 @@ class UnifiedAuthProvider(AuthProvider):
         email = request.headers.get("X-Forwarded-Email")
         if email:
             if email in _RESERVED_USERS:
+                return None
+            client_host = request.client.host if request.client else None
+            if not self._local_single_user and not peer_is_trusted_proxy(client_host):
                 return None
             return email
         if self._local_single_user:
