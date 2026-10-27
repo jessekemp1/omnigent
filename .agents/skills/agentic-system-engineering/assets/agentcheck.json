@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "gates": [
+    {
+      "id": "acceptance",
+      "argv": ["REPLACE_ME_WITH_TEST_COMMAND"],
+      "timeout_seconds": 180,
+      "required": true
+    }
+  ]
+}

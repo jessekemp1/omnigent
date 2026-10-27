@@ -1,0 +1,29 @@
+name: Agentic Systems Engineering Skill Tests
+on:
+  pull_request:
+    paths:
+      - '.agents/skills/agentic-system-engineering/**'
+      - '.github/workflows/agentic-skill-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.agents/skills/agentic-system-engineering/**'
+      - '.github/workflows/agentic-skill-ci.yml'
+permissions:
+  contents: read
+jobs:
+  agentcheck:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run AgentCheck tests
+        working-directory: .agents/skills/agentic-system-engineering
+        run: |
+          python3 -m unittest discover -s tests -v
+          python3 scripts/agentcheck.py --help

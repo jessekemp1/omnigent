@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "task_id": "replace-with-real-task-id",
+  "goal": "Describe a measurable engineering outcome, not merely code generation.",
+  "risk": "low",
+  "external_actions_allowed": false,
+  "baseline_ref": "HEAD",
+  "require_changes": true,
+  "allowed_paths": ["src/**", "tests/**", "README.md"],
+  "denied_paths": [".env", "**/.env", "*.pem", "**/*.pem", "*.key", "**/*.key", ".github/workflows/**"],
+  "requirements": [
+    {
+      "id": "R1",
+      "description": "Explain exactly what behavior must pass, including an important negative case.",
+      "acceptance_gates": ["acceptance"]
+    }
+  ]
+}
